@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DESAFÍO DE ATENCIÓN: ENCUENTRA LA PELOTA</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg1: #0f0c29;
+    --bg2: #302b63;
+    --bg3: #24243e;
+    --accent: #00f5d4;
+    --accent2: #f15bb5;
+    --cup: #ff9f1c;
+    --cup-dark: #e76f51;
+    --ball: #00bbf9;
+    --success: #00f5d4;
+    --error: #ff006e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, var(--bg1), var(--bg2), var(--bg3));
+    min-height: 100vh;
+    color: white;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .screen {
+    display: none;
+    width: 100%;
+    max-width: 900px;
+    padding: 20px;
+    text-align: center;
+    animation: fadeIn 0.5s ease;
+  }
+  .screen.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(12px);
+    border-radius: 16px;
+    padding: 14px 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .hud-item {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .hud-item span {
+    color: var(--accent);
+    font-weight: 800;
+  }
+
+  h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .subtitle { opacity: 0.85; margin-bottom: 25px; font-size: 1.05rem; }
+
+  .btn {
+    background: linear-gradient(135deg, var(--accent), #00bbf9);
+    color: #0f0c29;
+    border: none;
+    padding: 14px 36px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 8px 25px rgba(0,245,212,0.35);
+    margin: 8px;
+  }
+  .btn:hover {
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 12px 30px rgba(0,245,212,0.5);
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn.secondary {
+    background: linear-gradient(135deg, var(--accent2), #ff006e);
+    box-shadow: 0 8px 25px rgba(241,91,181,0.35);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  #game-area {
+    position: relative;
+    height: 320px;
+    margin: 30px auto;
+    width: 100%;
+    max-width: 780px;
+  }
+
+  .cup {
+    position: absolute;
+    width: 90px;
+    height: 110px;
+    cursor: pointer;
+    transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), top 0.3s ease;
+    z-index: 10;
+  }
+  .cup.fast { transition-duration: 0.22s; }
+  .cup.veryfast { transition-duration: 0.14s; }
+  .cup.extreme { transition-duration: 0.09s; }
+
+  .cup-body {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #ffbe0b, var(--cup-dark));
+    border-radius: 12px 12px 40% 40%;
+    position: relative;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4),
+                inset 0 -8px 15px rgba(0,0,0,0.25);
+    transition: transform 0.35s ease;
+  }
+  .cup.lifted .cup-body {
+    transform: translateY(-55px) rotate(-8deg);
+  }
+  .cup-rim {
+    position: absolute;
+    top: -6px;
+    left: 5%;
+    width: 90%;
+    height: 14px;
+    background: linear-gradient(90deg, #ffd60a, #ff9f1c);
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+
+  .ball {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    background: radial-gradient(circle at 35% 35%, #7df9ff, var(--ball) 60%, #0077b6);
+    border-radius: 50%;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 4px 12px rgba(0,187,249,0.6),
+                inset -3px -3px 8px rgba(0,0,0,0.25);
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .ball.visible { opacity: 1; }
+
+  #message {
+    min-height: 50px;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 15px 0;
+    transition: all 0.3s;
+  }
+  .tip-box {
+    background: rgba(0,245,212,0.12);
+    border: 1px solid rgba(0,245,212,0.3);
+    border-radius: 14px;
+    padding: 14px 20px;
+    margin: 18px auto;
+    max-width: 650px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  .tip-box strong { color: var(--accent); }
+
+  .distraction {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #f15bb5, transparent);
+    opacity: 0.6;
+    pointer-events: none;
+    animation: float 2.5s ease-in-out infinite;
+    z-index: 1;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-30px) scale(1.2); }
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin: 30px 0;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 18px;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .stat-card .value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--accent);
+  }
+  .stat-card .label { font-size: 0.85rem; opacity: 0.8; margin-top: 4px; }
+
+  .final-message {
+    background: linear-gradient(135deg, rgba(0,245,212,0.15), rgba(241,91,181,0.15));
+    border-radius: 18px;
+    padding: 24px;
+    margin: 25px 0;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  .level-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--accent2), #ff006e);
+    padding: 6px 18px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+  }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 1.6rem; }
+    .cup { width: 70px; height: 90px; }
+    #game-area { height: 260px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- PANTALLA INICIO -->
+<div id="start-screen" class="screen active">
+  <h1>🎯 DESAFÍO DE ATENCIÓN</h1>
+  <p class="subtitle">Encuentra la Pelota</p>
+  <p style="max-width:560px;margin:0 auto 30px;opacity:0.9;line-height:1.6">
+    Observa atentamente dónde se esconde la pelota. Los vasos se revolverán y tendrás que encontrar cuál la contiene.
+    ¡Pon a prueba tu atención, concentración y memoria visual!
+  </p>
+  <div class="tip-box">
+    <strong>Habilidades que entrenarás:</strong><br>
+    Atención selectiva • Atención sostenida • Atención visual • Velocidad de procesamiento • Control inhibitorio
+  </div>
+  <button class="btn" onclick="startGame()">▶ INICIAR JUEGO</button>
+</div>
+
+<!-- PANTALLA JUEGO -->
+<div id="game-screen" class="screen">
+  <div class="hud">
+    <div class="hud-item">Nivel: <span id="level-display">1</span></div>
+    <div class="hud-item">Puntos: <span id="score-display">0</span></div>
+    <div class="hud-item">Racha: <span id="streak-display">0</span></div>
+    <div class="hud-item">Tiempo: <span id="timer-display">--</span></div>
+  </div>
+
+  <div class="level-badge" id="level-name">Principiante</div>
+  <div id="message">Observa dónde está la pelota...</div>
+
+  <div id="game-area"></div>
+
+  <div class="tip-box" id="tip-box">
+    <strong>Atención selectiva:</strong> Concéntrate en la pelota e ignora todo lo demás.
+  </div>
+
+  <button class="btn secondary" onclick="restartGame()">Reiniciar</button>
+</div>
+
+<!-- PANTALLA FINAL -->
+<div id="final-screen" class="screen">
+  <h1>🏆 ¡Desafío Completado!</h1>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="value" id="final-score">0</div>
+      <div class="label">Puntuación total</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="final-levels">0/6</div>
+      <div class="label">Niveles completados</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="final-accuracy">0%</div>
+      <div class="label">Porcentaje de aciertos</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="final-time">0s</div>
+      <div class="label">Tiempo total</div>
+    </div>
+  </div>
+  <div class="level-badge" id="performance-level">Principiante</div>
+  <div class="final-message">
+    ¡Felicidades! Has puesto a prueba tu capacidad de atención. Recuerda que observar, concentrarse y procesar información son habilidades fundamentales para el aprendizaje y la vida cotidiana.
+  </div>
+  <button class="btn" onclick="restartGame()">🔄 Jugar de nuevo</button>
+</div>
+
+<script>
+const LEVELS = [
+  { name: "Principiante", cups: 3, swaps: 2, speed: "slow", timeLimit: null, distractions: false, fakeMoves: false, tip: "Atención selectiva: Concéntrate en la pelota e ignora las distracciones." },
+  { name: "Fácil", cups: 3, swaps: 5, speed: "normal", timeLimit: null, distractions: false, fakeMoves: false, tip: "Atención visual: Observa cuidadosamente cada movimiento de los vasos." },
+  { name: "Intermedio", cups: 4, swaps: 7, speed: "fast", timeLimit: 8, distractions: false, fakeMoves: false, tip: "Atención sostenida: Mantén la concentración durante todo el proceso." },
+  { name: "Difícil", cups: 5, swaps: 10, speed: "veryfast", timeLimit: 6, distractions: true, fakeMoves: false, tip: "Control inhibitorio: Evita seleccionar un vaso antes de estar seguro." },
+  { name: "Experto", cups: 6, swaps: 15, speed: "veryfast", timeLimit: 5, distractions: true, fakeMoves: true, tip: "Velocidad de procesamiento: Identifica rápidamente dónde está la pelota." },
+  { name: "Maestro de la atención", cups: 7, swaps: 20, speed: "extreme", timeLimit: 4, distractions: true, fakeMoves: true, tip: "¡Combina todas las habilidades de atención al máximo nivel!" }
+];
+
+let currentLevel = 0;
+let score = 0;
+let streak = 0;
+let correctAnswers = 0;
+let totalAttempts = 0;
+let startTime = 0;
+let totalTime = 0;
+let ballIndex = 0;
+let cups = [];
+let isShuffling = false;
+let canClick = false;
+let responseTimer = null;
+let timeLeft = 0;
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(freq, duration, type = 'sine', vol = 0.3) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.frequency.value = freq;
+  osc.type = type;
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playSuccess() {
+  playTone(523, 0.15); setTimeout(() => playTone(659, 0.15), 120); setTimeout(() => playTone(784, 0.25), 240);
+}
+function playError() {
+  playTone(200, 0.3, 'sawtooth', 0.2);
+}
+function playShuffle() {
+  playTone(300 + Math.random()*100, 0.08, 'triangle', 0.1);
+}
+
+function startGame() {
+  currentLevel = 0;
+  score = 0;
+  streak = 0;
+  correctAnswers = 0;
+  totalAttempts = 0;
+  startTime = Date.now();
+  document.getElementById('start-screen').classList.remove('active');
+  document.getElementById('final-screen').classList.remove('active');
+  document.getElementById('game-screen').classList.add('active');
+  updateHUD();
+  startLevel();
+}
+
+function restartGame() {
+  clearTimeout(responseTimer);
+  document.getElementById('final-screen').classList.remove('active');
+  document.getElementById('game-screen').classList.remove('active');
+  document.getElementById('start-screen').classList.add('active');
+}
+
+function updateHUD() {
+  document.getElementById('level-display').textContent = currentLevel + 1;
+  document.getElementById('score-display').textContent = score;
+  document.getElementById('streak-display').textContent = streak;
+  document.getElementById('level-name').textContent = LEVELS[currentLevel].name;
+}
+
+function startLevel() {
+  const level = LEVELS[currentLevel];
+  isShuffling = false;
+  canClick = false;
+  clearTimeout(responseTimer);
+  document.getElementById('timer-display').textContent = level.timeLimit ? level.timeLimit + 's' : '--';
+  document.getElementById('tip-box').innerHTML = `<strong>${level.tip.split(':')[0]}:</strong> ${level.tip.split(':')[1] || level.tip}`;
+  document.getElementById('message').textContent = 'Observa dónde está la pelota...';
+  document.getElementById('message').style.color = 'white';
+
+  createCups(level.cups);
+  placeBall();
+  showBallTemporarily();
+}
+
+function createCups(n) {
+  const area = document.getElementById('game-area');
+  area.innerHTML = '';
+  cups = [];
+  const spacing = Math.min(110, (area.clientWidth - 40) / n);
+  const startX = (area.clientWidth - (n - 1) * spacing) / 2 - 45;
+
+  for (let i = 0; i < n; i++) {
+    const cup = document.createElement('div');
+    cup.className = 'cup';
+    cup.dataset.index = i;
+    cup.style.left = (startX + i * spacing) + 'px';
+    cup.style.top = '120px';
+    cup.innerHTML = `
+      <div class="cup-body">
+        <div class="cup-rim"></div>
+      </div>
+      <div class="ball"></div>
+    `;
+    cup.addEventListener('click', () => handleCupClick(i));
+    area.appendChild(cup);
+    cups.push({ el: cup, pos: i, hasBall: false });
+  }
+}
+
+function placeBall() {
+  ballIndex = Math.floor(Math.random() * cups.length);
+  cups.forEach((c, i) => {
+    c.hasBall = (i === ballIndex);
+    const ball = c.el.querySelector('.ball');
+    ball.classList.toggle('visible', c.hasBall);
+  });
+}
+
+function showBallTemporarily() {
+  cups[ballIndex].el.classList.add('lifted');
+  setTimeout(() => {
+    cups[ballIndex].el.classList.remove('lifted');
+    cups.forEach(c => c.el.querySelector('.ball').classList.remove('visible'));
+    setTimeout(() => startShuffle(), 600);
+  }, 1500);
+}
+
+function startShuffle() {
+  const level = LEVELS[currentLevel];
+  isShuffling = true;
+  document.getElementById('message').textContent = '¡Sigue la pelota!';
+  document.getElementById('message').style.color = 'var(--accent)';
+
+  cups.forEach(c => {
+    c.el.classList.remove('fast', 'veryfast', 'extreme');
+    if (level.speed === 'fast') c.el.classList.add('fast');
+    if (level.speed === 'veryfast') c.el.classList.add('veryfast');
+    if (level.speed === 'extreme') c.el.classList.add('extreme');
+  });
+
+  if (level.distractions) addDistractions();
+
+  let swapsDone = 0;
+  const swapInterval = level.speed === 'slow' ? 700 :
+                       level.speed === 'normal' ? 480 :
+                       level.speed === 'fast' ? 320 :
+                       level.speed === 'veryfast' ? 220 : 150;
+
+  function doSwap() {
+    if (swapsDone >= level.swaps) {
+      finishShuffle();
+      return;
+    }
+    let i = Math.floor(Math.random() * cups.length);
+    let j = Math.floor(Math.random() * cups.length);
+    while (j === i) j = Math.floor(Math.random() * cups.length);
+
+    swapCups(i, j);
+    playShuffle();
+    swapsDone++;
+    setTimeout(doSwap, swapInterval);
+  }
+  doSwap();
+}
+
+function swapCups(i, j) {
+  const leftI = cups[i].el.style.left;
+  const leftJ = cups[j].el.style.left;
+  cups[i].el.style.left = leftJ;
+  cups[j].el.style.left = leftI;
+
+  const temp = cups[i];
+  cups[i] = cups[j];
+  cups[j] = temp;
+
+  cups[i].el.dataset.index = i;
+  cups[j].el.dataset.index = j;
+
+  if (ballIndex === i) ballIndex = j;
+  else if (ballIndex === j) ballIndex = i;
+}
+
+function finishShuffle() {
+  isShuffling = false;
+  canClick = true;
+  document.getElementById('message').textContent = '¿Dónde está la pelota? ¡Elige un vaso!';
+  document.getElementById('message').style.color = 'white';
+
+  document.querySelectorAll('.distraction').forEach(d => d.remove());
+
+  const level = LEVELS[currentLevel];
+  if (level.timeLimit) {
+    timeLeft = level.timeLimit;
+    document.getElementById('timer-display').textContent = timeLeft + 's';
+    responseTimer = setInterval(() => {
+      timeLeft--;
+      document.getElementById('timer-display').textContent = timeLeft + 's';
+      if (timeLeft <= 0) {
+        clearInterval(responseTimer);
+        handleTimeout();
+      }
+    }, 1000);
+  }
+}
+
+function addDistractions() {
+  const area = document.getElementById('game-area');
+  for (let i = 0; i < 4; i++) {
+    const d = document.createElement('div');
+    d.className = 'distraction';
+    d.style.left = (10 + Math.random() * 80) + '%';
+    d.style.top = (20 + Math.random() * 60) + '%';
+    d.style.animationDelay = (Math.random() * 2) + 's';
+    d.style.background = `radial-gradient(circle, hsl(${Math.random()*360}, 80%, 60%), transparent)`;
+    area.appendChild(d);
+  }
+}
+
+function handleCupClick(index) {
+  if (!canClick || isShuffling) return;
+  canClick = false;
+  clearInterval(responseTimer);
+
+  totalAttempts++;
+  const correct = (index === ballIndex);
+
+  cups[ballIndex].el.classList.add('lifted');
+  cups[ballIndex].el.querySelector('.ball').classList.add('visible');
+  if (index !== ballIndex) {
+    cups[index].el.classList.add('lifted');
+  }
+
+  if (correct) {
+    playSuccess();
+    correctAnswers++;
+    streak++;
+    let points = 100;
+    if (LEVELS[currentLevel].timeLimit && timeLeft > 0) {
+      points += Math.floor(timeLeft * 15);
+    }
+    if (streak >= 3) points += streak * 20;
+    score += points;
+    document.getElementById('message').textContent = `¡Correcto! +${points} puntos`;
+    document.getElementById('message').style.color = 'var(--success)';
+  } else {
+    playError();
+    streak = 0;
+    score = Math.max(0, score - 30);
+    document.getElementById('message').textContent = '¡Incorrecto! La pelota estaba aquí';
+    document.getElementById('message').style.color = 'var(--error)';
+  }
+
+  updateHUD();
+
+  setTimeout(() => {
+    if (correct) {
+      if (currentLevel < LEVELS.length - 1) {
+        currentLevel++;
+        setTimeout(startLevel, 800);
+      } else {
+        setTimeout(showFinalScreen, 1000);
+      }
+    } else {
+      setTimeout(startLevel, 1200);
+    }
+  }, 1800);
+}
+
+function handleTimeout() {
+  canClick = false;
+  totalAttempts++;
+  streak = 0;
+  score = Math.max(0, score - 30);
+  cups[ballIndex].el.classList.add('lifted');
+  cups[ballIndex].el.querySelector('.ball').classList.add('visible');
+  document.getElementById('message').textContent = '¡Se acabó el tiempo!';
+  document.getElementById('message').style.color = 'var(--error)';
+  playError();
+  updateHUD();
+  setTimeout(startLevel, 1500);
+}
+
+function showFinalScreen() {
+  totalTime = Math.floor((Date.now() - startTime) / 1000);
+  const accuracy = totalAttempts > 0 ? Math.round((correctAnswers / totalAttempts) * 100) : 100;
+
+  document.getElementById('game-screen').classList.remove('active');
+  document.getElementById('final-screen').classList.add('active');
+
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('final-levels').textContent = `${LEVELS.length}/${LEVELS.length}`;
+  document.getElementById('final-accuracy').textContent = accuracy + '%';
+  document.getElementById('final-time').textContent = totalTime + 's';
+
+  let perf = 'Principiante';
+  if (score >= 2500 && accuracy >= 85) perf = 'Maestro';
+  else if (score >= 1800 && accuracy >= 70) perf = 'Avanzado';
+  else if (score >= 1000) perf = 'Intermedio';
+  document.getElementById('performance-level').textContent = 'Nivel de desempeño: ' + perf;
+}
+</script>
+</body>
+</html>
